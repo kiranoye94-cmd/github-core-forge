@@ -18,9 +18,16 @@
 
 import { createApp } from './app.ts';
 
-const ENV_URL = (process.env.MAKEFUN_ENV_URL ?? '').replace(/\/+$/, '');
+// Validate the env origin before anything registers: a trailing slash would make the env
+// dial a wrong path, and an http(s) prefix is required for the kernel to reach us.
+const RAW_ENV_URL = process.env.MAKEFUN_ENV_URL ?? '';
+const ENV_URL = RAW_ENV_URL.replace(/\/+$/, '');
 if (ENV_URL === '') {
   process.stderr.write('[entry] MAKEFUN_ENV_URL is not set: there is no env to register with\n');
+  process.exit(1);
+}
+if (!/^https?:\/\//.test(ENV_URL)) {
+  process.stderr.write(`[entry] MAKEFUN_ENV_URL must be an http(s) origin, got: ${RAW_ENV_URL}\n`);
   process.exit(1);
 }
 
@@ -91,6 +98,7 @@ async function main(): Promise<void> {
   process.stdout.write('[entry] registered; waiting for the env to say done\n');
 
   await waitForDone();
+  // Close only after the env is done, so the suite can still reach the server mid-run.
   server.close();
   process.stdout.write('[entry] done\n');
 }
