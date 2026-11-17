@@ -127,8 +127,15 @@ function graphqlOne(input: unknown): Record<string, unknown> {
   }
   if (q.includes('viewer')) return { data: { viewer: { login: OWNER } } };
   if (q.includes('repository')) {
-    const r = namedRepo(String(v.owner ?? ''), String(v.name ?? ''));
-    return { data: { repository: r ? gqlRepo(r, q, v) : null } };
+    // owner/name may be inline in the query text, in variables, or nested under an input.
+    const inline = /owner:\s*"([^"]*)"/.exec(q);
+    const inlineName = /name:\s*"([^"]*)"/.exec(q);
+    const nested = v.repository && typeof v.repository === 'object' ? object(v.repository) : v;
+    const owner = nested.owner ?? v.o ?? inline?.[1] ?? '';
+    const name = nested.name ?? v.n ?? inlineName?.[1] ?? '';
+    const r = namedRepo(String(owner), String(name));
+    const vars = { ...nested, owner, name };
+    return { data: { repository: r ? gqlRepo(r, q, vars) : null } };
   }
   return { data: {} };
 }
